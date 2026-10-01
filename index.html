@@ -116,6 +116,9 @@ nav button[aria-current="page"]{color:var(--accent);font-weight:600}
 .filterchip{display:inline-flex;align-items:center;gap:8px;margin:10px 0 0;padding:6px 8px 6px 12px;border-radius:999px;background:var(--soft);border:0;font-size:14px;font-weight:600}
 
 /* resumen */
+.chipscroll{display:flex;gap:8px;overflow-x:auto;margin:10px -16px 0;padding:2px 16px 8px;scrollbar-width:none}
+.chipscroll::-webkit-scrollbar{display:none}
+.chipscroll .chip{flex:none}
 .donutwrap{position:relative;width:min(240px,70vw);margin:14px auto 6px}
 .donut{display:block;width:100%;height:auto}
 .donutwrap .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
@@ -229,7 +232,7 @@ const DEFAULT_CATS = [['Supermercado','#2E8B57'],['Restaurantes y café','#E07A1
 const PALETTE = ['#2E8B57','#E07A1F','#1B4DDB','#7A4FD3','#D6455D','#0E9AA7','#B8860B','#5B6C8F','#C2417A','#4C9F38','#8C5E3C','#3D7EA6'];
 const NONE = {id: '', name: 'Sin categoría', color: '#7A8580'};
 let state = null, idb = null, dl = null;
-const ui = {tab: 'add', month: today().slice(0, 7), filterCat: null};
+const ui = {tab: 'add', month: today().slice(0, 7), filterCat: null, sumCats: new Set()};
 let draft = {amt: '', cat: '', note: '', date: today(), auto: true};
 const health = {ls: null, idb: null, persist: null};
 
@@ -603,31 +606,41 @@ function donutSVG(items, total) {
   }).join('');
   return `<svg class="donut" viewBox="0 0 140 140" role="img" aria-label="Gasto por categoría"><circle cx="70" cy="70" r="${R}" fill="none" stroke="var(--soft)" stroke-width="16"/><g transform="rotate(-90 70 70)">${segs}</g></svg>`;
 }
-function dailySVG(mk) {
+function dailySVG(mk, list) {
   const [y, m] = mk.split('-').map(Number), D = new Date(y, m, 0).getDate();
   const sums = Array(D).fill(0);
-  monthExps(mk).forEach(e => { sums[+e.date.slice(8) - 1] += e.amt; });
+  list.forEach(e => { sums[+e.date.slice(8) - 1] += e.amt; });
   const max = Math.max(...sums, 1), W = 300, H = 70, bw = W / D;
   const bars = sums.map((v, i) => { const h = v ? Math.max(3, v / max * H) : 1.5; return `<rect x="${(i * bw + bw * 0.15).toFixed(2)}" y="${(H - h).toFixed(2)}" width="${(bw * 0.7).toFixed(2)}" height="${h.toFixed(2)}" rx="1.5" fill="${v ? 'var(--accent)' : 'var(--line)'}"/>`; }).join('');
   const peak = sums.indexOf(Math.max(...sums));
   const peakTxt = sums[peak] ? `Día con más gasto: ${dayLabel(`${mk}-${pad(peak + 1)}`)} · ${fmtEUR(sums[peak])}` : '';
   return `<div class="daily"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Gasto por día">${bars}</svg><div class="axis"><span>1</span><span>${D}</span></div>${peakTxt ? `<p>${peakTxt}</p>` : ''}</div>`;
 }
+function sumFilter(all) {
+  const sel = ui.sumCats;
+  const hasNone = all.some(e => catKey(e) === '__none');
+  const chip = (key, name, color, on) => `<button class="chip" style="--c:${color}" data-sumcat="${key}" aria-pressed="${on}"><i class="dot"></i>${esc(name)}</button>`;
+  return `<div class="chipscroll" role="group" aria-label="Filtrar por categoría"><button class="chip" style="--c:var(--accent)" data-sumcat="__all" aria-pressed="${!sel.size}">Todas</button>${state.cats.map(c => chip(c.id, c.name, c.color, sel.has(c.id))).join('')}${hasNone ? chip('__none', NONE.name, NONE.color, sel.has('__none')) : ''}</div>`;
+}
 function viewSum() {
-  const mk = ui.month, list = monthExps(mk), total = sum(list);
+  const sel = ui.sumCats;
+  [...sel].forEach(k => { if (k !== '__none' && !state.cats.some(c => c.id === k)) sel.delete(k); });
+  const inSel = e => !sel.size || sel.has(catKey(e));
+  const mk = ui.month, all = monthExps(mk), list = all.filter(inSel), total = sum(list);
   const map = new Map();
   list.forEach(e => { const k = catKey(e), c = catBy(e.cat); const r = map.get(k) || {key: k, name: c.name, color: c.color, sum: 0}; r.sum += e.amt; map.set(k, r); });
   const items = [...map.values()].sort((a, b) => b.sum - a.sum);
   const [y, m] = mk.split('-').map(Number), D = new Date(y, m, 0).getDate();
   const endDate = mk === today().slice(0, 7) ? today() : `${mk}-${pad(D)}`;
   const win = new Set(Array.from({length: 7}, (_, i) => shiftDate(endDate, -i)));
-  const win7 = sum(state.exps.filter(e => win.has(e.date)));
-  const prevTotal = sum(monthExps(shiftMonth(mk, -1)));
+  const win7 = sum(state.exps.filter(e => win.has(e.date) && inSel(e)));
+  const prevTotal = sum(monthExps(shiftMonth(mk, -1)).filter(inSel));
   return `${monthBar(mk)}
+  ${sumFilter(all)}
   <div class="donutwrap">${donutSVG(items, total)}<div class="mid"><b>${fmtEUR(total)}</b><small>${list.length} ${list.length === 1 ? 'gasto' : 'gastos'}</small></div></div>
   <div class="stats"><div class="stat"><small>Prom. diario · 7 días</small><b>${fmtEUR(Math.round(win7 / 7))}</b></div><div class="stat"><small>Mes anterior</small><b>${fmtEUR(prevTotal)}</b></div><div class="stat"><small>Mayor gasto</small><b>${list.length ? fmtEUR(Math.max(...list.map(e => e.amt))) : '—'}</b></div></div>
   ${items.length ? `<h2>Por categoría</h2><div class="list">${items.map(it => `<button class="catline" style="--c:${it.color}" data-catfilter="${it.key}"><span class="top"><i class="dot"></i><span class="nm">${esc(it.name)}</span><span class="pc">${Math.round(it.sum / total * 100)} %</span><span class="v">${fmtEUR(it.sum)}</span></span><span class="bar"><i style="width:${(it.sum / total * 100).toFixed(1)}%"></i></span></button>`).join('')}</div>
-  <h2>Por día</h2>${dailySVG(mk)}` : `<div class="list"><p class="empty">No hay gastos en este mes.</p></div>`}`;
+  <h2>Por día</h2>${dailySVG(mk, list)}` : `<div class="list"><p class="empty">${sel.size ? 'No hay gastos de las categorías elegidas en este mes.' : 'No hay gastos en este mes.'}</p></div>`}`;
 }
 function viewHist() {
   const mk = ui.month;
@@ -747,11 +760,18 @@ function editExp(id) {
 /* ---------- eventos globales ---------- */
 function setTab(t) { ui.tab = t; if (t !== 'hist') ui.filterCat = null; render(); window.scrollTo(0, 0); }
 document.addEventListener('click', ev => {
-  const t = ev.target.closest('[data-tab],[data-edit],[data-a],[data-catdel],[data-snap],[data-catfilter]');
+  const t = ev.target.closest('[data-tab],[data-edit],[data-a],[data-catdel],[data-snap],[data-catfilter],[data-sumcat]');
   if (!t) return;
   const d = t.dataset;
   if (d.tab) return setTab(d.tab);
   if (d.edit) return editExp(d.edit);
+  if (d.sumcat) {
+    const sel = ui.sumCats, sc = $('.chipscroll') ? $('.chipscroll').scrollLeft : 0;
+    if (d.sumcat === '__all') sel.clear(); else if (sel.has(d.sumcat)) sel.delete(d.sumcat); else sel.add(d.sumcat);
+    render();
+    const bar = $('.chipscroll'); if (bar) bar.scrollLeft = sc;
+    return;
+  }
   if (d.catfilter) { ui.filterCat = d.catfilter; return setTab('hist'); }
   if (d.snap) return restoreSnap(d.snap);
   if (d.catdel) {
