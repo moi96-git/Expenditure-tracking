@@ -119,6 +119,8 @@ nav button[aria-current="page"]{color:var(--accent);font-weight:600}
 .chipscroll{display:flex;gap:8px;overflow-x:auto;margin:10px -16px 0;padding:2px 16px 8px;scrollbar-width:none}
 .chipscroll::-webkit-scrollbar{display:none}
 .chipscroll .chip{flex:none}
+.chipscroll .chip.off{opacity:.55;text-decoration:line-through;background:var(--paper)}
+.hint{margin:0;color:var(--muted);font-size:13px}
 .donutwrap{position:relative;width:min(240px,70vw);margin:14px auto 6px}
 .donut{display:block;width:100%;height:auto}
 .donutwrap .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
@@ -141,6 +143,33 @@ nav button[aria-current="page"]{color:var(--accent);font-weight:600}
 .daily svg{display:block;width:100%;height:auto}
 .axis{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:4px}
 .daily p{font-size:14px;color:var(--muted);margin-top:8px}
+
+/* topes */
+.budsum{padding:16px}
+.budsum small{display:block;color:var(--muted);font-size:14px}
+.budsum .big{display:block;font:700 34px/1.1 var(--display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:2px 0 6px}
+.budsum p{font-size:14px;color:var(--muted);margin-top:6px}
+.budsum .pace{color:var(--ink)}
+.ok-t{color:var(--ok)} .warn-t{color:var(--warn)} .over-t{color:var(--bad)}
+.bar2{position:relative;height:8px;border-radius:4px;background:var(--soft);margin-top:12px}
+.bar2 i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--ok)}
+.bar2.warn i{background:#E0A100}
+.bar2.over i{background:var(--bad)}
+.bar2 u{position:absolute;top:-4px;bottom:-4px;width:2px;border-radius:1px;background:var(--ink);opacity:.55}
+.bud{padding:12px 14px;border-top:1px solid var(--line)}
+.bud:first-child{border-top:0}
+.bud .top{display:flex;align-items:center;gap:10px}
+.bud .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.bud .nm{flex:1;font-weight:500;min-width:0}
+.bud .v{font:600 15px var(--display);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.bud .v small{font:400 13px var(--body);color:var(--muted)}
+.bud .sub{margin-top:7px;font-size:13px;font-weight:500}
+.budrow{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.budrow .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.budrow .bn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.budin{display:flex;align-items:center;gap:6px;width:136px;flex:none}
+.budin .field{text-align:right;min-height:44px;padding:8px 12px}
+.budin span{color:var(--muted)}
 
 /* avisos */
 .banner{background:var(--warn-bg);color:var(--warn);border-radius:14px;padding:14px;margin-bottom:6px}
@@ -232,7 +261,7 @@ const DEFAULT_CATS = [['Supermercado','#2E8B57'],['Restaurantes y café','#E07A1
 const PALETTE = ['#2E8B57','#E07A1F','#1B4DDB','#7A4FD3','#D6455D','#0E9AA7','#B8860B','#5B6C8F','#C2417A','#4C9F38','#8C5E3C','#3D7EA6'];
 const NONE = {id: '', name: 'Sin categoría', color: '#7A8580'};
 let state = null, idb = null, dl = null;
-const ui = {tab: 'add', month: today().slice(0, 7), filterCat: null, sumCats: new Set()};
+const ui = {tab: 'add', month: today().slice(0, 7), filterCat: null, sumHide: new Set()};
 let draft = {amt: '', cat: '', note: '', date: today(), auto: true};
 const health = {ls: null, idb: null, persist: null};
 
@@ -245,7 +274,7 @@ function freshState() {
 const okCat = c => !!c && typeof c.id === 'string' && typeof c.name === 'string';
 const okExp = e => !!e && typeof e.id === 'string' && Number.isInteger(e.amt) && e.amt > 0 && typeof e.cat === 'string' && typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date);
 function valid(o) { return !!o && typeof o === 'object' && Array.isArray(o.cats) && Array.isArray(o.exps) && o.cats.every(okCat) && o.exps.every(okExp); }
-const normCat = c => ({id: c.id, name: String(c.name).slice(0, 30) || 'Sin nombre', color: /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : '#7A8580', u: Number.isFinite(c.u) ? c.u : 0});
+const normCat = c => ({id: c.id, name: String(c.name).slice(0, 30) || 'Sin nombre', color: /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : '#7A8580', u: Number.isFinite(c.u) ? c.u : 0, budget: (Number.isInteger(c.budget) && c.budget > 0) ? c.budget : 0});
 const normExp = e => { const ts = Number.isFinite(e.ts) ? e.ts : (Date.parse(e.date) || 0); return {id: e.id, amt: e.amt, cat: e.cat, note: String(e.note || '').slice(0, 80), date: e.date, ts, u: Number.isFinite(e.u) ? e.u : ts}; };
 function normDel(d) { const r = {}; if (d && typeof d === 'object') for (const k in d) if (Number.isFinite(d[k])) r[k] = d[k]; return r; }
 function normalize(o) {
@@ -528,20 +557,20 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#ov'
 function chipsHTML(sel) {
   return state.cats.map(c => `<button class="chip" style="--c:${c.color}" data-id="${c.id}" aria-pressed="${c.id === sel}"><i class="dot"></i>${esc(c.name)}</button>`).join('');
 }
-function rowHTML(e) {
+function rowHTML(e, showDate) {
   const c = catBy(e.cat);
-  return `<button class="row-item" data-edit="${e.id}"><i class="dot" style="--c:${c.color}"></i><span class="txt"><b>${esc(e.note || c.name)}</b>${e.note ? `<small>${esc(c.name)}</small>` : ''}</span><span class="amt">${fmtEUR(e.amt)}</span></button>`;
+  const sub = showDate ? dayLabel(e.date) + (e.note ? ' · ' + c.name : '') : (e.note ? c.name : '');
+  return `<button class="row-item" data-edit="${e.id}"><i class="dot" style="--c:${c.color}"></i><span class="txt"><b>${esc(e.note || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span><span class="amt">${fmtEUR(e.amt)}</span></button>`;
 }
-function daySection(title, date) {
-  const list = state.exps.filter(e => e.date === date).sort((a, b) => b.ts - a.ts);
+const expsBetween = (from, to) => state.exps.filter(e => e.date >= from && e.date <= to).sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
+function periodSection(title, sub, list, empty, showDate) {
   const map = new Map();
   list.forEach(e => { const k = catKey(e), c = catBy(e.cat); const r = map.get(k) || {name: c.name, color: c.color, sum: 0}; r.sum += e.amt; map.set(k, r); });
   const pills = [...map.values()].sort((a, b) => b.sum - a.sum)
     .map(it => `<span class="pill" style="--c:${it.color}"><i></i>${esc(it.name)} <b>${fmtEUR(it.sum)}</b></span>`).join('');
-  const empty = title === 'Hoy' ? 'Aún no registras nada hoy.' : 'Sin gastos ese día.';
-  return `<div class="sechead"><h2>${title}<small>${dayLabel(date)}</small></h2><b>${fmtEUR(sum(list))}</b></div>
+  return `<div class="sechead"><h2>${title}<small>${sub}</small></h2><b>${fmtEUR(sum(list))}</b></div>
   ${pills ? `<div class="pills">${pills}</div>` : ''}
-  <div class="list">${list.length ? list.map(rowHTML).join('') : `<p class="empty">${empty}</p>`}</div>`;
+  <div class="list">${list.length ? list.map(e => rowHTML(e, showDate)).join('') : `<p class="empty">${empty}</p>`}</div>`;
 }
 function monthBar(mk) {
   const cur = today().slice(0, 7);
@@ -559,9 +588,9 @@ function viewAdd() {
   <input id="note" class="field" maxlength="50" placeholder="Nota (opcional)" enterkeyhint="done" autocomplete="off" value="${esc(draft.note)}">
   <div class="fieldrow"><label for="date">Fecha</label><input type="date" id="date" class="field" max="${t}" value="${draft.date}"></div>
   <button class="btn primary" id="save">Guardar gasto</button>
-  ${daySection('Hoy', t)}
-  ${daySection('Ayer', shiftDate(t, -1))}
-  ${daySection('Hace una semana', shiftDate(t, -7))}
+  ${periodSection('Hoy', dayLabel(t), expsBetween(t, t), 'Aún no registras nada hoy.', false)}
+  ${periodSection('Ayer', dayLabel(shiftDate(t, -1)), expsBetween(shiftDate(t, -1), shiftDate(t, -1)), 'Sin gastos ayer.', false)}
+  ${periodSection('Últimos 7 días', 'sin hoy ni ayer', expsBetween(shiftDate(t, -6), shiftDate(t, -2)), 'Sin gastos en esos días.', true)}
   ${state.exps.length ? '' : `<p class="note">¿Ya usabas la app? <button class="linkbtn" data-a="importjson">Restaura una copia</button></p>`}`;
 }
 function bindAdd() {
@@ -617,15 +646,40 @@ function dailySVG(mk, list) {
   return `<div class="daily"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Gasto por día">${bars}</svg><div class="axis"><span>1</span><span>${D}</span></div>${peakTxt ? `<p>${peakTxt}</p>` : ''}</div>`;
 }
 function sumFilter(all) {
-  const sel = ui.sumCats;
+  const hide = ui.sumHide;
   const hasNone = all.some(e => catKey(e) === '__none');
-  const chip = (key, name, color, on) => `<button class="chip" style="--c:${color}" data-sumcat="${key}" aria-pressed="${on}"><i class="dot"></i>${esc(name)}</button>`;
-  return `<div class="chipscroll" role="group" aria-label="Filtrar por categoría"><button class="chip" style="--c:var(--accent)" data-sumcat="__all" aria-pressed="${!sel.size}">Todas</button>${state.cats.map(c => chip(c.id, c.name, c.color, sel.has(c.id))).join('')}${hasNone ? chip('__none', NONE.name, NONE.color, sel.has('__none')) : ''}</div>`;
+  const chip = (key, name, color) => { const on = !hide.has(key); return `<button class="chip${on ? '' : ' off'}" style="--c:${color}" data-sumcat="${key}" aria-pressed="${on}"><i class="dot"></i>${esc(name)}</button>`; };
+  const hidden = [...hide].map(k => k === '__none' ? NONE.name : (state.cats.find(c => c.id === k) || {}).name).filter(Boolean);
+  return `<div class="chipscroll" role="group" aria-label="Categorías visibles"><button class="chip" style="--c:var(--accent)" data-sumcat="__all" aria-pressed="${!hide.size}">Todas</button>${state.cats.map(c => chip(c.id, c.name, c.color)).join('')}${hasNone ? chip('__none', NONE.name, NONE.color) : ''}</div>
+  <p class="hint">${hidden.length ? 'Ocultas: ' + esc(hidden.join(', ')) + '. Toca una para volver a mostrarla.' : 'Toca una categoría para ocultarla del gráfico.'}</p>`;
+}
+function budgetSection(list, mk) {
+  const hide = ui.sumHide;
+  if (!state.cats.some(c => (c.budget || 0) > 0))
+    return `<p class="hint" style="margin-top:14px">¿Quieres comparar con lo que esperas gastar? <button class="linkbtn" data-tab="set">Define topes mensuales en Ajustes</button>.</p>`;
+  const cats = state.cats.filter(c => (c.budget || 0) > 0 && !hide.has(c.id));
+  if (!cats.length) return '';
+  const rows = cats.map(c => { const spent = sum(list.filter(e => e.cat === c.id)); return {c, spent, cap: c.budget, p: spent / c.budget}; }).sort((a, b) => b.p - a.p);
+  const cap = rows.reduce((a, r) => a + r.cap, 0), spent = rows.reduce((a, r) => a + r.spent, 0), left = cap - spent;
+  const ids = new Set(cats.map(c => c.id));
+  const noCap = sum(list.filter(e => !ids.has(e.cat)));
+  const [y, m] = mk.split('-').map(Number), D = new Date(y, m, 0).getDate();
+  const isCur = mk === today().slice(0, 7), day = +today().slice(8);
+  const tick = isCur ? (day / D * 100).toFixed(1) : null;
+  const cls = (sp, cp) => sp > cp ? 'over' : (sp / cp >= 0.85 ? 'warn' : 'ok');
+  const bar = (sp, cp) => `<div class="bar2 ${cls(sp, cp)}"><i style="width:${Math.min(100, sp / cp * 100).toFixed(1)}%"></i>${tick !== null ? `<u style="left:${tick}%"></u>` : ''}</div>`;
+  let pace = '';
+  if (isCur) { const exp = Math.round(cap * day / D), diff = spent - exp; pace = `<p class="pace">A hoy (día ${day} de ${D}) lo esperado es ${fmtEUR(exp)}: vas ${fmtEUR(Math.abs(diff))} ${diff > 0 ? 'por encima' : 'por debajo'} del ritmo. La marca vertical de cada barra señala dónde deberías ir hoy.</p>`; }
+  return `<h2>Topes del mes</h2>
+  <div class="card budsum"><small>${left >= 0 ? 'Te quedan' : 'Te pasaste por'}</small><b class="big ${cls(spent, cap)}-t">${fmtEUR(Math.abs(left))}</b>
+    <p>Has gastado ${fmtEUR(spent)} de ${fmtEUR(cap)} en las categorías con tope.</p>${bar(spent, cap)}${pace}${noCap ? `<p>Además, ${fmtEUR(noCap)} en categorías sin tope.</p>` : ''}</div>
+  <div class="list" style="margin-top:12px">${rows.map(r => { const k = cls(r.spent, r.cap), rest = r.cap - r.spent;
+    return `<div class="bud"><div class="top"><i class="dot" style="background:${r.c.color}"></i><span class="nm">${esc(r.c.name)}</span><span class="v">${fmtEUR(r.spent)} <small>/ ${fmtEUR(r.cap)}</small></span></div>${bar(r.spent, r.cap)}<div class="sub ${k}-t">${rest >= 0 ? 'Quedan ' + fmtEUR(rest) : 'Te pasaste por ' + fmtEUR(-rest)} · ${Math.round(r.p * 100)} %</div></div>`; }).join('')}</div>`;
 }
 function viewSum() {
-  const sel = ui.sumCats;
-  [...sel].forEach(k => { if (k !== '__none' && !state.cats.some(c => c.id === k)) sel.delete(k); });
-  const inSel = e => !sel.size || sel.has(catKey(e));
+  const hide = ui.sumHide;
+  [...hide].forEach(k => { if (k !== '__none' && !state.cats.some(c => c.id === k)) hide.delete(k); });
+  const inSel = e => !hide.has(catKey(e));
   const mk = ui.month, all = monthExps(mk), list = all.filter(inSel), total = sum(list);
   const map = new Map();
   list.forEach(e => { const k = catKey(e), c = catBy(e.cat); const r = map.get(k) || {key: k, name: c.name, color: c.color, sum: 0}; r.sum += e.amt; map.set(k, r); });
@@ -639,8 +693,9 @@ function viewSum() {
   ${sumFilter(all)}
   <div class="donutwrap">${donutSVG(items, total)}<div class="mid"><b>${fmtEUR(total)}</b><small>${list.length} ${list.length === 1 ? 'gasto' : 'gastos'}</small></div></div>
   <div class="stats"><div class="stat"><small>Prom. diario · 7 días</small><b>${fmtEUR(Math.round(win7 / 7))}</b></div><div class="stat"><small>Mes anterior</small><b>${fmtEUR(prevTotal)}</b></div><div class="stat"><small>Mayor gasto</small><b>${list.length ? fmtEUR(Math.max(...list.map(e => e.amt))) : '—'}</b></div></div>
+  ${budgetSection(list, mk)}
   ${items.length ? `<h2>Por categoría</h2><div class="list">${items.map(it => `<button class="catline" style="--c:${it.color}" data-catfilter="${it.key}"><span class="top"><i class="dot"></i><span class="nm">${esc(it.name)}</span><span class="pc">${Math.round(it.sum / total * 100)} %</span><span class="v">${fmtEUR(it.sum)}</span></span><span class="bar"><i style="width:${(it.sum / total * 100).toFixed(1)}%"></i></span></button>`).join('')}</div>
-  <h2>Por día</h2>${dailySVG(mk, list)}` : `<div class="list"><p class="empty">${sel.size ? 'No hay gastos de las categorías elegidas en este mes.' : 'No hay gastos en este mes.'}</p></div>`}`;
+  <h2>Por día</h2>${dailySVG(mk, list)}` : `<div class="list"><p class="empty">${hide.size && all.length ? 'No hay gastos en las categorías visibles de este mes.' : 'No hay gastos en este mes.'}</p></div>`}`;
 }
 function viewHist() {
   const mk = ui.month;
@@ -651,12 +706,14 @@ function viewHist() {
   const fname = ui.filterCat !== null ? (ui.filterCat === '__none' ? NONE.name : catBy(ui.filterCat).name) : '';
   const body = Object.keys(days).sort().reverse().map(d => {
     const es = days[d].sort((a, b) => b.ts - a.ts);
-    return `<div class="dayhead"><span>${dayLabel(d)}</span><b>${fmtEUR(sum(es))}</b></div><div class="list">${es.map(rowHTML).join('')}</div>`;
+    return `<div class="dayhead"><span>${dayLabel(d)}</span><b>${fmtEUR(sum(es))}</b></div><div class="list">${es.map(e => rowHTML(e)).join('')}</div>`;
   }).join('');
   return `${monthBar(mk)}
   ${ui.filterCat !== null ? `<button class="filterchip" data-a="clearfilter">${esc(fname)} <span aria-hidden="true">✕</span><span class="sr">Quitar filtro</span></button>` : ''}
   ${body || `<div class="list" style="margin-top:14px"><p class="empty">No hay gastos${ui.filterCat !== null ? ' con este filtro' : ' en este mes'}.</p></div>`}`;
 }
+const fmtBudgetInput = c => c % 100 === 0 ? String(c / 100) : (c / 100).toFixed(2).replace('.', ',');
+const budTotalText = () => { const t = state.cats.reduce((a, c) => a + (c.budget || 0), 0); return t ? `Total de topes mensuales: ${fmtEUR(t)}` : 'Aún no defines ningún tope.'; };
 function viewSet() {
   const m = state.meta;
   const pers = health.persist === true ? ['ok', 'Activada'] : health.persist === false ? ['mid', 'No garantizada'] : ['mid', 'Sin verificar'];
@@ -674,6 +731,12 @@ function viewSet() {
   <div class="card">
     ${state.cats.map(c => `<div class="catrow"><input type="color" value="${c.color}" data-catcolor="${c.id}" aria-label="Color de ${esc(c.name)}"><input class="field" value="${esc(c.name)}" maxlength="30" data-catname="${c.id}" aria-label="Nombre de la categoría"><button class="iconbtn" data-catdel="${c.id}" aria-label="Eliminar ${esc(c.name)}">×</button></div>`).join('')}
     <div class="catrow" style="margin-top:12px"><input class="field" id="newcat" maxlength="30" placeholder="Nueva categoría"><button class="btn small primary" id="addcat" style="min-height:44px">Añadir</button></div>
+  </div>
+  <h2>Topes mensuales</h2>
+  <div class="card">
+    <p class="note" style="margin:0 0 12px">Cuánto esperas gastar al mes en cada categoría. Déjalo vacío si no quieres tope. Se compara con tus gastos en Resumen.</p>
+    ${state.cats.map(c => `<div class="budrow"><i class="dot" style="background:${c.color}"></i><span class="bn">${esc(c.name)}</span><label class="budin"><span class="sr">Tope mensual de ${esc(c.name)}</span><input class="field" inputmode="decimal" autocomplete="off" placeholder="Sin tope" data-catbudget="${c.id}" value="${(c.budget || 0) ? fmtBudgetInput(c.budget) : ''}"><span>€</span></label></div>`).join('')}
+    <p class="note" id="budtotal">${budTotalText()}</p>
   </div>
   <h2>Protección de tus datos</h2>
   <div class="card">
@@ -766,8 +829,8 @@ document.addEventListener('click', ev => {
   if (d.tab) return setTab(d.tab);
   if (d.edit) return editExp(d.edit);
   if (d.sumcat) {
-    const sel = ui.sumCats, sc = $('.chipscroll') ? $('.chipscroll').scrollLeft : 0;
-    if (d.sumcat === '__all') sel.clear(); else if (sel.has(d.sumcat)) sel.delete(d.sumcat); else sel.add(d.sumcat);
+    const hide = ui.sumHide, sc = $('.chipscroll') ? $('.chipscroll').scrollLeft : 0;
+    if (d.sumcat === '__all') hide.clear(); else if (hide.has(d.sumcat)) hide.delete(d.sumcat); else hide.add(d.sumcat);
     render();
     const bar = $('.chipscroll'); if (bar) bar.scrollLeft = sc;
     return;
@@ -806,9 +869,20 @@ document.addEventListener('change', ev => {
   } else if (t.dataset && t.dataset.catcolor) {
     const c = state.cats.find(x => x.id === t.dataset.catcolor);
     if (c && /^#[0-9a-f]{6}$/i.test(t.value)) { c.color = t.value; c.u = Date.now(); commit(); }
+  } else if (t.dataset && t.dataset.catbudget) {
+    const c = state.cats.find(x => x.id === t.dataset.catbudget); if (!c) return;
+    const v = t.value.trim(), cents = v ? parseAmt(v) : 0;
+    c.budget = cents; c.u = Date.now(); commit();
+    t.value = cents ? fmtBudgetInput(cents) : '';
+    const tot = $('#budtotal'); if (tot) tot.textContent = budTotalText();
   } else if (t.id === 'file' && t.files && t.files[0]) {
     importFromFile(t.files[0]); t.value = '';
   }
+});
+
+document.addEventListener('input', ev => {
+  const t = ev.target;
+  if (t.dataset && t.dataset.catbudget !== undefined) t.value = cleanAmt(t.value);
 });
 
 /* ---------- render ---------- */
